@@ -271,8 +271,25 @@ echo -en $RESET_TEXT
 echo_green ">> Good luck in the swarm!"
 echo_blue ">> And remember to star the repo on GitHub! --> https://github.com/gensyn-ai/rl-swarm"
 
-python3 -m rgym_exp.runner.swarm_launcher \
-    --config-path "$ROOT/rgym_exp/config" \
-    --config-name "rg-swarm.yaml" 
-
-wait  # Keep script running until Ctrl+C
+# Continuous restart loop
+RUN_COUNT=0
+while true; do
+    RUN_COUNT=$((RUN_COUNT + 1))
+    echo_green ">> Starting swarm launcher (Run #$RUN_COUNT)..."
+    
+    python3 -m rgym_exp.runner.swarm_launcher \
+        --config-path "$ROOT/rgym_exp/config" \
+        --config-name "rg-swarm.yaml"
+    
+    EXIT_CODE=$?
+    
+    if [ $EXIT_CODE -eq 0 ]; then
+        echo_green ">> Swarm launcher exited normally. Restarting in 5 seconds..."
+    else
+        echo_red ">> Swarm launcher exited with error code $EXIT_CODE. Restarting in 10 seconds..."
+        sleep 10
+        continue
+    fi
+    
+    sleep 5
+done

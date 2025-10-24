@@ -11,9 +11,12 @@ set -euo pipefail
 
 ROOT=$PWD
 
+# GenRL Swarm version to use
+GENRL_TAG="0.1.9"
+
 # Configuration
 NUM_INSTANCES=${NUM_INSTANCES:-3}
-GPU_MEMORY_PER_INSTANCE=${GPU_MEMORY_PER_INSTANCE:-7000}
+GPU_MEMORY_PER_INSTANCE=${GPU_MEMORY_PER_INSTANCE:-8000}
 MONITOR_INTERVAL=${MONITOR_INTERVAL:-60}
 AUTO_RESTART=${AUTO_RESTART:-"yes"}
 LOG_BASE_DIR="$ROOT/user/logs/multi_swarm"
@@ -49,6 +52,27 @@ echo_blue() { echo -e "$BLUE_TEXT$1$RESET_TEXT"; }
 echo_red() { echo -e "$RED_TEXT$1$RESET_TEXT"; }
 echo_yellow() { echo -e "$YELLOW_TEXT$1$RESET_TEXT"; }
 echo_cyan() { echo -e "$CYAN_TEXT$1$RESET_TEXT"; }
+
+# ==============================================================================
+# Installation
+# ==============================================================================
+install_dependencies() {
+    echo_blue "=== Installing Dependencies ==="
+    
+    echo_green ">> Getting requirements..."
+    python3 -m pip install --upgrade pip
+    
+    echo_green ">> Installing GenRL..."
+    python3 -m pip install gensyn-genrl==${GENRL_TAG}
+    python3 -m pip install reasoning-gym>=0.1.20 # for reasoning gym env
+    python3 -m pip install hivemind@git+https://github.com/gensyn-ai/hivemind@639c964a8019de63135a2594663b5bec8e5356dd # We need the latest, 1.1.11 is broken
+    
+    echo_green ">> Ensuring jinja2 is up to date..."
+    python3 -m pip install --upgrade 'jinja2>=3.1.0'
+    
+    echo_green "✓ Dependencies installed successfully"
+    echo ""
+}
 
 # ==============================================================================
 # Banner
@@ -100,6 +124,23 @@ setup_directories() {
     
     mkdir -p "$LOG_BASE_DIR"
     
+    # Setup base configs directory
+    if [ ! -d "$ROOT/configs" ]; then
+        mkdir "$ROOT/configs"
+    fi
+    
+    # Copy or check base config
+    if [ -f "$ROOT/configs/rg-swarm.yaml" ]; then
+        if ! cmp -s "$ROOT/rgym_exp/config/rg-swarm.yaml" "$ROOT/configs/rg-swarm.yaml"; then
+            echo_blue "  Base config differs from default, using existing config"
+        fi
+    else
+        if [ -f "$ROOT/rgym_exp/config/rg-swarm.yaml" ]; then
+            cp "$ROOT/rgym_exp/config/rg-swarm.yaml" "$ROOT/configs/rg-swarm.yaml"
+            echo_green "  Created base config from default"
+        fi
+    fi
+    
     for i in $(seq 1 $NUM_INSTANCES); do
         INSTANCE_DIR="$ROOT/user/instance_$i"
         mkdir -p "$INSTANCE_DIR"/{modal-login/temp-data,keys,configs,logs}
@@ -109,9 +150,11 @@ setup_directories() {
             cp "$EXISTING_CREDENTIALS" "$INSTANCE_DIR/modal-login/temp-data/userData.json"
         fi
         
-        # Copy base config if it doesn't exist
+        # Copy base config to instance if it doesn't exist
         if [ ! -f "$INSTANCE_DIR/configs/rg-swarm.yaml" ]; then
-            if [ -f "$ROOT/rgym_exp/config/rg-swarm.yaml" ]; then
+            if [ -f "$ROOT/configs/rg-swarm.yaml" ]; then
+                cp "$ROOT/configs/rg-swarm.yaml" "$INSTANCE_DIR/configs/rg-swarm.yaml"
+            elif [ -f "$ROOT/rgym_exp/config/rg-swarm.yaml" ]; then
                 cp "$ROOT/rgym_exp/config/rg-swarm.yaml" "$INSTANCE_DIR/configs/rg-swarm.yaml"
             fi
         fi
@@ -178,10 +221,28 @@ echo "" >> "$instance_log"
 
 cd "$ROOT"
 
-python -m rgym_exp.runner.swarm_launcher \\
-    --config-path "$instance_dir/configs" \\
-    --config-name "rg-swarm.yaml" \\
-    >> "$instance_log" 2>&1
+# Continuous restart loop
+RUN_COUNT=0
+while true; do
+    RUN_COUNT=\$((RUN_COUNT + 1))
+    echo "" >> "$instance_log"
+    echo "=== Starting swarm launcher (Run #\$RUN_COUNT) at \$(date) ===" >> "$instance_log"
+    
+    python -m rgym_exp.runner.swarm_launcher \\
+        --config-path "$instance_dir/configs" \\
+        --config-name "rg-swarm.yaml" \\
+        >> "$instance_log" 2>&1
+    
+    EXIT_CODE=\$?
+    
+    if [ \$EXIT_CODE -eq 0 ]; then
+        echo "=== Swarm launcher exited normally. Restarting in 5 seconds... ===" >> "$instance_log"
+        sleep 5
+    else
+        echo "=== Swarm launcher exited with error code \$EXIT_CODE. Restarting in 10 seconds... ===" >> "$instance_log"
+        sleep 10
+    fi
+done
 WRAPPER_EOF
     
     chmod +x "$wrapper_script"
@@ -320,6 +381,9 @@ main() {
     echo "ORG_ID: $ORG_ID"
     echo "Log directory: $LOG_BASE_DIR"
     echo ""
+    
+    # Install dependencies
+    install_dependencies
     
     # Setup
     setup_credentials
