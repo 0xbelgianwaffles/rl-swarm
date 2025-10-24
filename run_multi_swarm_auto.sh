@@ -142,7 +142,9 @@ setup_directories() {
     fi
     
     for i in $(seq 1 $NUM_INSTANCES); do
-        INSTANCE_DIR="$ROOT/user/instance_$i"
+        # Support GPU_USER_DIR for multi-GPU setups (set by 8-pod wrapper)
+        USER_BASE_DIR="${GPU_USER_DIR:-$ROOT/user}"
+        INSTANCE_DIR="$USER_BASE_DIR/instance_$i"
         mkdir -p "$INSTANCE_DIR"/{modal-login/temp-data,keys,configs,logs}
         
         # Copy credentials to each instance
