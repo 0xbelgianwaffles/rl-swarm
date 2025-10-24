@@ -1,0 +1,88 @@
+services:
+  # Instance 1
+  swarm-instance-1:
+    build:
+      context: .
+      dockerfile: containerfiles/swarm-node/swarm.containerfile
+      args:
+        - BASE_IMAGE=nvidia/cuda:12.6.3-cudnn-devel-ubuntu24.04
+    ports:
+      - "3001:3000"  # Map container port 3000 to host 3001
+    volumes:
+      - ./user/instance_1/modal-login:/home/gensyn/rl_swarm/modal-login/temp-data
+      - ./user/instance_1/keys:/home/gensyn/rl_swarm/keys
+      - ./user/instance_1/configs:/home/gensyn/rl_swarm/configs
+      - ./user/instance_1/logs:/home/gensyn/rl_swarm/logs
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-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}
+      - GENSYN_RESET_CONFIG=${GENSYN_RESET_CONFIG:-}
+      - INSTANCE_NUM=1
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    stdin_open: true
+    tty: true
+
+  # Instance 2
+  swarm-instance-2:
+    build:
+      context: .
+      dockerfile: containerfiles/swarm-node/swarm.containerfile
+      args:
+        - BASE_IMAGE=nvidia/cuda:12.6.3-cudnn-devel-ubuntu24.04
+    ports:
+      - "3002:3000"  # Map container port 3000 to host 3002
+    volumes:
+      - ./user/instance_2/modal-login:/home/gensyn/rl_swarm/modal-login/temp-data
+      - ./user/instance_2/keys:/home/gensyn/rl_swarm/keys
+      - ./user/instance_2/configs:/home/gensyn/rl_swarm/configs
+      - ./user/instance_2/logs:/home/gensyn/rl_swarm/logs
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-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}
+      - GENSYN_RESET_CONFIG=${GENSYN_RESET_CONFIG:-}
+      - INSTANCE_NUM=2
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    stdin_open: true
+    tty: true
+
+  # Instance 3
+  swarm-instance-3:
+    build:
+      context: .
+      dockerfile: containerfiles/swarm-node/swarm.containerfile
+      args:
+        - BASE_IMAGE=nvidia/cuda:12.6.3-cudnn-devel-ubuntu24.04
+    ports:
+      - "3003:3000"  # Map container port 3000 to host 3003
+    volumes:
+      - ./user/instance_3/modal-login:/home/gensyn/rl_swarm/modal-login/temp-data
+      - ./user/instance_3/keys:/home/gensyn/rl_swarm/keys
+      - ./user/instance_3/configs:/home/gensyn/rl_swarm/configs
+      - ./user/instance_3/logs:/home/gensyn/rl_swarm/logs
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-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}
+      - GENSYN_RESET_CONFIG=${GENSYN_RESET_CONFIG:-}
+      - INSTANCE_NUM=3
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    stdin_open: true
+    tty: true
+
